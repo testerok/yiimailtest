@@ -4,42 +4,49 @@ namespace app\controllers;
 
 use Yii;
 use yii\filters\AccessControl;
-use yii\web\Controller;
 use yii\filters\VerbFilter;
-use app\models\LoginForm;
-use app\models\ContactForm;
+use yii\web\Controller;
+use yii\web\Session;
+use app\models\SPLoginForm;
+use app\models\SPSendRegEmail;
+use app\models\SPCreateUser;
+use app\models\SPEditUser;
 
 class SiteController extends Controller
 {
-    /**
-     * @inheritdoc
-     */
+	
+    /*ограничиваем видимость страниц в зависимости от авторизации******************************************************/
     public function behaviors()
     {
-        return [
-            'access' => [
+		return [
+
+			/*Настраиваем правила доступа*/
+			/******************************************************************************/
+			'access' => [
                 'class' => AccessControl::className(),
-                'only' => ['logout'],
+				'only' => ['edituser', 'logout', 'sendauthmail', 'loginuser'],
                 'rules' => [
                     [
-                        'actions' => ['logout'],
-                        'allow' => true,
-                        'roles' => ['@'],
+						'allow' => true,
+						'controllers' => ['site'],
+                        'actions' => ['loginuser', 'sendauthmail'],
+                        'roles' => ['?'],
+						'verbs' => ['GET', 'POST'],
                     ],
-                ],
-            ],
-            'verbs' => [
-                'class' => VerbFilter::className(),
-                'actions' => [
-                    'logout' => ['post'],
-                ],
-            ],
+					[
+						'allow' => true,
+						'controllers' => ['site'],
+                        'actions' => ['logout' , 'edituser'],
+                        'roles' => ['@'],
+						'verbs' => ['GET', 'POST'],
+                    ],
+                ]
+            ]
         ];
     }
-
-    /**
-     * @inheritdoc
-     */
+	
+ 
+    /*действия*********************************************************************************************************/
     public function actions()
     {
         return [
@@ -51,75 +58,87 @@ class SiteController extends Controller
                 'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
             ],
         ];
-    }
+    } 
+	 
 
-    /**
-     * Displays homepage.
-     *
-     * @return string
-     */
+    /*домашняя страница************************************************************************************************/
     public function actionIndex()
     {
         return $this->render('index');
     }
 
-    /**
-     * Login action.
-     *
-     * @return string
-     */
-    public function actionLogin()
+	
+    /*авторизация пользователя по E-mail ссылке************************************************************************/
+    public function actionLoginuser($email)
     {
-        if (!Yii::$app->user->isGuest) {
-            return $this->goHome();
+		if (!Yii::$app->user->isGuest) { 
+			return $this->redirect('/aa_yiiorig/web/index.php?r=site%2Fedituser');
         }
-
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
-        }
-        return $this->render('login', [
-            'model' => $model,
-        ]);
+	
+		if (Yii::$app->request->get()) {
+			$model = new SPLoginForm();
+			$modelData = $model->login($email);
+			if (!$modelData){
+				return $this->goHome();
+			}    
+        }else{
+			return $this->goHome();
+		}
+		
+		return $this->render('edituser', [
+				'model' => $modelData
+		]);
     }
+	
+	
+	/*отправляем E-mail для авторизации********************************************************************************/
+	public function actionSendauthmail()
+	{
+		$model = new SPSendRegEmail();
 
-    /**
-     * Logout action.
-     *
-     * @return string
-     */
-    public function actionLogout()
-    {
-        Yii::$app->user->logout();
+		if ($model->load(Yii::$app->request->post())) {
+			if ($model->validate()) {
+				if($model->sendEmail()){
+					Yii::$app->getSession()->setFlash('warning', 'Проверьте почту.');
+				//	return $this->goHome();	
+				}
+			}
+		}
 
-        return $this->goHome();
-    }
-
-    /**
-     * Displays contact page.
-     *
-     * @return string
-     */
-    public function actionContact()
-    {
-        $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->contact(Yii::$app->params['adminEmail'])) {
-            Yii::$app->session->setFlash('contactFormSubmitted');
-
-            return $this->refresh();
-        }
-        return $this->render('contact', [
-            'model' => $model,
-        ]);
-    }
-
-    /**
-     * Displays about page.
-     *
-     * @return string
-     */
-    public function actionAbout()
-    {
-        return $this->render('about');
-    }
+		return $this->render('sendauthmail', [
+			'model' => $model,
+		]);
+	}
+	
+	
+	/*редактирование имени пользователмя*******************************************************************************/
+	public function actionEdituser()
+	{
+		$model = new SPEditUser();
+		$model = ($model = SPEditUser::findOne(Yii::$app->user->id)) ? $model : new SPEditUser();
+		
+		if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+			
+			if($model->updateUser()){
+				Yii::$app->session->setFlash('access', 'Профиль изменен');
+			}else{
+				Yii::$app->session->setFlash('warning', 'Профиль не изменен');
+				Yii::error('Ошибка записи. Профиль не изменне');
+				return $this->refresh();
+			}
+		}
+		
+		return $this->render('edituser', [
+			'model' => $model,
+		]);
+	}
+	
+	
+	/* разлогинивание *************************************************************************************************/
+	public function actionLogout()
+	{
+		Yii::$app->user->logout(); 
+		return $this->goHome();	
+	}
+	
 }
