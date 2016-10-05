@@ -3,7 +3,7 @@
 use yii\db\Migration;
 
 /**
- * Handles the creation for table `user`.
+ * Handles the creation for table `yiiusers`.
  */
 class m160919_160731_create_user_table extends Migration
 {
@@ -12,7 +12,7 @@ class m160919_160731_create_user_table extends Migration
      */
     public function up()
     {
-        $this->createTable('user', [
+        $this->createTable('yiiusers', [
             'id' => Schema::TYPE_PK,
 			'username' => Schema::TYPE_STRING.' NOT NULL',
 			'email' => Schema::TYPE_STRING.' NOT NULL',
@@ -24,6 +24,6 @@ class m160919_160731_create_user_table extends Migration
      */
     public function down()
     {
-        $this->dropTable('user');
+        $this->dropTable('yiiusers');
     }
 }
